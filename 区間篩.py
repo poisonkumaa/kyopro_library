@@ -3,6 +3,8 @@ import math
 
 #以下の素数を列挙
 def eratosthenes(n):
+    if n == 1:
+        return []
     is_prime = ([False, True] * (n//2+1))[0: n+1]
     is_prime[1] = False
     is_prime[2] = True
