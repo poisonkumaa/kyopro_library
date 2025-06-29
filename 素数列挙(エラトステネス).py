@@ -12,7 +12,7 @@ def eratosthenes(n):
             continue
         if i*i > n:
             break
-        for k in range(i*i, n+1, i):
+        for k in range(i*i, n+1, 2*i):
             is_prime[k] = False
     return [i for i in range(n+1) if is_prime[i]] 
 
