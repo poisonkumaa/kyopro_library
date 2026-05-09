@@ -1,5 +1,4 @@
 #ABC403-Eでの例を示す。
-#ABC403
 
 class Trie:
     class Node:
