@@ -1,11 +1,11 @@
-#めぐる式二分探索？
+#めぐる式二分探索
 
 def check(mid):
-    #内容がないよう
+    #内容
     return 0
 
 ok=0
-ng=10**9
+ng=2**61-1
 
 while ng - ok > 1:
     mid = (ng + ok) // 2
