@@ -1,6 +1,6 @@
-import sys, time, random, heapq, math, itertools
+import sys, time, random, heapq, math, itertools, copy
 from collections import deque, Counter, defaultdict
-from sortedcontainers import SortedSet, SortedList
+# from sortedcontainers import SortedSet, SortedList
 from bisect import bisect, bisect_left, bisect_right
 import heapq as hq
 from functools import cache, cmp_to_key
@@ -12,5 +12,5 @@ mi = lambda: map(int, input().split())
 li = lambda: list(mi())
 inf = 2 ** 61 - 1
 mod = 998244353
-
+dir = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 
