@@ -1,7 +1,8 @@
 #ACL,local対応
+#inf = 2 ** 61 - 1を使用することで高速化
 
 import typing
-
+inf = 2 ** 61 - 1
 def _ceil_pow2(n: int) -> int:
     x = 0
     while (1 << x) < n:
@@ -210,47 +211,210 @@ class LazySegTree:
         self._lz[k] = self._id
 
 
-#チートシート
+#========================================================
+#区間加算・区間最大値取得
 
-#区間最小
-def op(ele1, ele2):
-    return min(ele1, ele2)
-e = 1<<63
-#--------------------------------------------------
-#区間最大
-def op(ele1, ele2):
-    return max(ele1, ele2)
-e = -1<<63
-#--------------------------------------------------
-#区間和(xorに変更可能)
-def op(ele1, ele2):
-    return ele1 + ele2
-e = 0
+INF = inf
 
-#===========================================================
+# 値の2項演算
+def op(value1, value2):
+    return max(value1, value2)
 
-#区間加算(xorに変更可能)
-def mapping(func, ele):
-    return func + ele
-def composition(func_upper, func_lower):
-    return func_upper + func_lower
-id = 0
-#------------------------------------------------------
-#区間変更
-ID = 1<<63
-def mapping(func, ele):
-    if func == ID:
-        return ele
-    else:
-        return func
-def composition(func_upper, func_lower):
-    if func_upper == ID:
-        return func_lower
-    else:
-        return func_upper
-id = ID
-#--------------------------------------------------------
+# 上のブロックの作用素を下のブロックの値に伝播
+def mapping(f, value):
+    return f + value
 
-lst = [] #リストは任意のリスト
+# 上のブロックの作用素を下のブロックの作用素に伝播
+def composition(f, g):
+    return f + g
 
-seg = LazySegTree(op, e, mapping, composition, id, lst)
+# 値の単位元
+e = -INF
+
+# 作用素の単位元
+id_ = 0
+
+l = [0,1,2,3,4,5,6]
+LST = LazySegTree(op, e, mapping, composition, id_, l)
+
+#========================================================
+#区間更新・区間最大値取得
+
+# 値の2項演算
+def op(value1, value2):
+    return max(value1, value2)
+
+# 上のブロックの作用素を下のブロックの値に伝播
+def mapping(f, value):
+    return value if f is id_ else f
+
+# 上のブロックの作用素を下のブロックの作用素に伝播
+def composition(f, g):
+    return g if f is id_ else f
+
+# 値の単位元
+e = -inf
+
+# 作用素の単位元
+id_ = None
+
+l = [0,1,2,3,4,5,6]
+LST = LazySegTree(op, e, mapping, composition, id_, l)
+
+#========================================================
+#区間加算・区間最小値
+
+INF = inf
+
+# 値の2項演算
+def op(value1, value2):
+    return min(value1, value2)
+
+# 上のブロックの作用素を下のブロックの値に伝播
+def mapping(f, value):
+    return f + value
+
+# 上のブロックの作用素を下のブロックの作用素に伝播
+def composition(f, g):
+    return f + g
+
+# 値の単位元
+e = INF
+
+# 作用素の単位元
+id_ = 0
+
+l = [0,1,2,3,4,5,6]
+LST = LazySegTree(op, e, mapping, composition, id_, l)
+
+#========================================================
+#区間更新・区間最小値
+
+# 値の2項演算
+def op(value1, value2):
+    return min(value1, value2)
+
+# 上のブロックの作用素を下のブロックの値に伝播
+def mapping(f, value):
+    return value if f is id_ else f
+
+# 上のブロックの作用素を下のブロックの作用素に伝播
+def composition(f, g):
+    return g if f is id_ else f
+
+# 値の単位元
+e = inf
+
+# 作用素の単位元
+id_ = None
+
+l = [0,1,2,3,4,5,6]
+LST = LazySegTree(op, e, mapping, composition, id_, l)
+
+#========================================================
+#区間加算・区間和取得
+
+# 値の2項演算
+def op(value1, value2):
+    return [value1[0]+value2[0],value1[1]+value2[1]]
+
+# 上のブロックの作用素を下のブロックの値に伝播
+def mapping(f, value):
+    return [value[0],value[1]+f*value[0]]
+
+# 上のブロックの作用素を下のブロックの作用素に伝播
+def composition(f, g):
+    return f+g
+
+# 値の単位元
+e = [0,0]
+
+# 作用素の単位元
+id_ = 0
+
+l = [0,1,2,3,4,5,6]
+
+# 区間和取得の場合は[区間のサイズ, 値]として扱う
+l = [[1,value] for value in l]
+LST = LazySegTree(op, e, mapping, composition, id_, l)
+
+#======================================================================
+# 区間加算，0,1,2乗区間和取得
+mod = 998244353
+
+def op(x, y):
+    z = [0, 0, 0]
+    z[0] = x[0] + y[0]
+    z[1] = (x[1] + y[1]) % mod
+    z[2] = (x[2] + y[2]) % mod
+    
+    return z
+E = [0, 0, 0]
+
+def mapping(f, x):
+    z = [0, 0, 0]
+    z[0] = x[0]
+    z[1] = (x[1] + f * x[0]) % mod
+    z[2] = (x[2] + 2 * x[1] * f + x[0] * f % mod * f) % mod
+    return z
+
+def composition(f, g):
+    return f + g
+    
+N = int(input())
+seg = LazySegTree(op, E, mapping, composition, 0, [[1, 0, 0] for _ in range(N)])
+
+#========================================================
+#区間更新・区間和取得
+
+# 値の2項演算
+def op(value1, value2):
+    return [value1[0]+value2[0],value1[1]+value2[1]]
+
+# 上のブロックの作用素を下のブロックの値に伝播
+def mapping(f, value):
+    if f is id_:return value
+    return [value[0],f*value[0]]
+
+# 上のブロックの作用素を下のブロックの作用素に伝播
+def composition(f, g):
+    return g if f is id_ else f
+
+# 値の単位元
+e = [0,0]
+
+# 作用素の単位元
+id_ = None
+
+l = [0,1,2,3,4,5,6]
+
+# 区間和取得の場合は[区間のサイズ, 値]として扱う
+l = [[1,value] for value in l]
+LST = LazySegTree(op, e, mapping, composition, id_, l)
+
+
+########使用例########################################################################
+l = [0,1,2,3,4,5,6]
+l = [[1,value] for value in l]  
+LST = LazySegTree(op, e, mapping, composition, id_, l)
+
+# [2,5)を3で更新
+LST.apply(2,5,3) # [0,1,3,3,3,5,6]
+
+#返り値は[要素数, 値]となる
+
+# 区間の演算結果を取得
+print(LST.prod(2,5)) # [3,9]
+print(LST.prod(3,7)) # [4,17]
+
+# LST.prod(left, x)がgを満たす最大のxを二分探索
+left = 0
+g = lambda x: x[1]<15
+print(LST.max_right(left , g)) # 5
+
+#i = 2を4に更新
+LST.set(2, [1, 4])   
+
+
+
+#========================================================
