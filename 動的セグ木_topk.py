@@ -1,173 +1,161 @@
-# 配列Aについて、一点更新、上位K個,下位K個の総和を高速に計算できる
-# |A| < 5e5, A[i] < 1e9
+# 配列Aについて、一点更新、上位K個の総和を高速に計算できる
+# |A| < 1e9, A[i] < 1e9
 # 初期化ー＞すべて0とする
 
-import sys
-import gc
 
-# メモリに余裕があり、速度を最優先する場合
-# プログラム開始時にGCを止めることで、実行中のメモリ解放のフリーズを防ぐ
-gc.disable()
+from array import array
 
 class FastDynamicSegmentTree:
-    def __init__(self, init_array, max_value=10**9, max_nodes=None):
-        # 10^9 なら 30ビットで表現可能
-        self.MAX_LOG = max_value.bit_length()
+    def __init__(self, max_value=10**9):
+        self.max_val = max_value
+        self.root = 1
         
-        N = len(init_array)
-        self.A = list(init_array)
+        # ノード管理用の配列
+        self.left = array('I', [0, 0])  # 左の子のインデックス
+        self.right = array('I', [0, 0]) # 右の子のインデックス
+        self.cnt = array('I', [0, 0])   # 部分木の要素数
+        self.sm = array('q', [0, 0])    # 部分木の総和
         
-        # 必要なノード数を見積もる (N + Q) * MAX_LOG + α
-        if max_nodes is None:
-            # 例: N=400,000, Q=200,000 を想定
-            max_nodes = N * self.MAX_LOG + 200000 * self.MAX_LOG + 100
-            
-        # 【極限最適化 1】leftとrightを単一の配列に統合（キャッシュヒット率向上）
-        # ch[node << 1] が左の子 (bit=0), ch[(node << 1) | 1] が右の子 (bit=1)
-        self.ch = [0] * (max_nodes * 2)
-        self.cnt = [0] * max_nodes
-        self.sm = [0] * max_nodes
-        
+        # 次に割り当てるノードのインデックス
         self.next_idx = 2
         
-        ch = self.ch
-        cnt = self.cnt
-        sm = self.sm
-        MAX_LOG = self.MAX_LOG
-        
-        for val in self.A:
-            node = 1
-            cnt[node] += 1
-            sm[node] += val
-            for b in range(MAX_LOG - 1, -1, -1):
-                bit = (val >> b) & 1
-                idx = (node << 1) | bit
-                nxt = ch[idx]
-                if not nxt:
-                    nxt = self.next_idx
-                    self.next_idx += 1
-                    ch[idx] = nxt
-                node = nxt
-                cnt[node] += 1
-                sm[node] += val
+        # 現在の配列Aの値を保持 (一点更新のため)
+        # Aのインデックス -> 値
+        self.current_values = {}
+
+    def _reserve(self):
+        if self.next_idx >= len(self.left):
+            # 現在の長さ分だけ拡張
+            extension_size = len(self.left)
+            self.left.extend(array('I', [0] * extension_size))
+            self.right.extend(array('I', [0] * extension_size))
+            self.cnt.extend(array('I', [0] * extension_size))
+            self.sm.extend(array('q', [0] * extension_size))
 
     def update(self, idx, val):
-        old_val = self.A[idx]
-        if old_val == val:
-            return
-        self.A[idx] = val
+        """
+        配列Aのインデックス idx を val に更新する
+        """
+        # 1. 以前の値があれば取り消す (-1)
+        if idx in self.current_values:
+            old_val = self.current_values[idx]
+            if old_val == val:
+                return
+            self._add(old_val, -1)
         
-        ch = self.ch
-        cnt = self.cnt
-        sm = self.sm
-        MAX_LOG = self.MAX_LOG
-        
-        # --- 古い値の削除 (-1) ---
-        node = 1
-        cnt[node] -= 1
-        sm[node] -= old_val
-        for b in range(MAX_LOG - 1, -1, -1):
-            bit = (old_val >> b) & 1
-            node = ch[(node << 1) | bit]
-            cnt[node] -= 1
-            sm[node] -= old_val
+        # 2. 新しい値を追加する (+1)
+        self.current_values[idx] = val
+        self._add(val, 1)
 
-        # --- 新しい値の追加 (+1) ---
-        node = 1
-        cnt[node] += 1
-        sm[node] += val
-        for b in range(MAX_LOG - 1, -1, -1):
-            bit = (val >> b) & 1
-            idx = (node << 1) | bit
-            nxt = ch[idx]
-            if not nxt:
-                nxt = self.next_idx
-                self.next_idx += 1
-                ch[idx] = nxt
-            node = nxt
-            cnt[node] += 1
-            sm[node] += val
-
-    def query_top(self, k):
-        """上位 K 個の総和を返す"""
-        if k <= 0: return 0
-        cnt = self.cnt
-        sm = self.sm
-        ch = self.ch
+    def _add(self, val, diff_cnt):
+        """
+        内部メソッド: val の位置に diff_cnt (+1 or -1) を加算
+        Iterative (非再帰) 実装
+        """
+        node = self.root
+        l, r = 0, self.max_val
+        diff_sum = val * diff_cnt
         
-        if k >= cnt[1]:
-            return sm[1]
+        # 根の情報を更新
+        self.cnt[node] += diff_cnt
+        self.sm[node] += diff_sum
+        
+        while l < r:
+            mid = (l + r) // 2
             
+            # 行き先 (0:左, 1:右)
+            if val <= mid:
+                # 左の子へ
+                if not self.left[node]:
+                    self._reserve()
+                    self.left[node] = self.next_idx
+                    self.next_idx += 1
+                node = self.left[node]
+                r = mid
+            else:
+                # 右の子へ
+                if not self.right[node]:
+                    self._reserve()
+                    self.right[node] = self.next_idx
+                    self.next_idx += 1
+                node = self.right[node]
+                l = mid + 1
+            
+            # パス上のノードを更新 (戻りがけの計算は不要、降りながら足すだけ)
+            self.cnt[node] += diff_cnt
+            self.sm[node] += diff_sum
+
+    def query(self, k):
+        """
+        上位 K 個の総和を返す
+        Iterative (非再帰) 実装
+        """
+        if k <= 0:
+            return 0
+        
+        node = self.root
+        
+        # 全体数よりKが大きい場合は全合計を返す
+        if k >= self.cnt[node]:
+            return self.sm[node]
+        
+        l, r = 0, self.max_val
         ans = 0
-        node = 1
-        val_acc = 0
-        for b in range(self.MAX_LOG - 1, -1, -1):
-            # 右の子(大きい値)のインデックス
-            r_child = ch[(node << 1) | 1]
+        
+        while l < r:
+            mid = (l + r) // 2
             
-            # 【極限最適化 2】0番インデックスは常に0なので、if nullチェックが不要
-            r_cnt = cnt[r_child]
+            # 右側（大きい値側）の子を見る
+            r_child = self.right[node]
+            
+            # 右側の子にいくつあるか
+            r_cnt = self.cnt[r_child] if r_child else 0
             
             if k <= r_cnt:
+                # 上位K個はすべて右側に収まる -> 右へ移動
                 node = r_child
-                val_acc |= (1 << b)
+                l = mid + 1
             else:
-                ans += sm[r_child]
+                # 右側をすべて採用し、残りを左側で探す
+                r_sum = self.sm[r_child] if r_child else 0
+                ans += r_sum
                 k -= r_cnt
-                node = ch[node << 1]
                 
-        if k > 0:
-            ans += k * val_acc
-        return ans
-
-    def query_bottom(self, k):
-        """下位 K 個の総和を返す"""
-        if k <= 0: return 0
-        cnt = self.cnt
-        sm = self.sm
-        ch = self.ch
+                # 左へ移動
+                node = self.left[node]
+                r = mid
+                
+                # 左の子がない場合（通常ここには来ないが安全策）
+                if not node:
+                    break
         
-        if k >= cnt[1]:
-            return sm[1]
+        # 葉に到達した場合 (l == r)
+        if l == r and k > 0:
+            ans += l * k
             
-        ans = 0
-        node = 1
-        val_acc = 0
-        for b in range(self.MAX_LOG - 1, -1, -1):
-            # 左の子(小さい値)のインデックス
-            l_child = ch[node << 1]
-            l_cnt = cnt[l_child]
-            
-            if k <= l_cnt:
-                node = l_child
-            else:
-                ans += sm[l_child]
-                k -= l_cnt
-                node = ch[(node << 1) | 1]
-                val_acc |= (1 << b)
-                
-        if k > 0:
-            ans += k * val_acc
         return ans
     
 
-"""
-#コード例：Remove Median Operations "https://atcoder.jp/contests/arc210/tasks/arc210_b"
 
-N, M, Q = mi()
-A = li()
-B = li()
-all = A + B
-seg = FastDynamicSegmentTree(all)
-
-q = [tuple(mi()) for _ in range(Q)]
-out = []
-for t,i,x in q:
-    i -= 1
-    if t == 2:
-        i += N
-    seg.update(i, x)
-    out.append(str(seg.query_top(N//2) + seg.query_bottom(N//2)))
-sys.stdout.write("\n".join(out) + "\n")
-
-"""
+# --- 動作確認 ---
+if __name__ == "__main__":
+    import time
+    
+    # 簡単なテスト
+    dst = FastDynamicSegmentTree(max_value=10**9)
+    
+    # A = [10, 20, 5, 30]
+    dst.update(0, 10)
+    dst.update(1, 20)
+    dst.update(2, 5)
+    dst.update(3, 30)
+    
+    # Top 2 sum -> 30 + 20 = 50
+    print(f"Top 2 sum: {dst.query(2)}") 
+    
+    # Update A[2] 5 -> 100
+    dst.update(2, 100)
+    # A = [10, 20, 100, 30]
+    
+    # Top 3 sum -> 100 + 30 + 20 = 150
+    print(f"Top 3 sum: {dst.query(3)}")
