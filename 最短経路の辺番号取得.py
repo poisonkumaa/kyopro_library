@@ -1,4 +1,4 @@
-#startからendまでの最短経路を返す関数
+#グラフにおいてstartノードからendノードまでの最短経路を返す関数
 #g[i] = [[j,num]...]とする必要がある
 def find_shortest_path_edges(start, end, g):
     from collections import deque
