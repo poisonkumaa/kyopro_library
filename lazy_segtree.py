@@ -1,6 +1,3 @@
-#thanks to Shirotsume
-
-
 class lazy_segtree():
     def update(self,k):self.d[k]=self.op(self.d[2*k],self.d[2*k+1])
     def all_apply(self,k,f):
